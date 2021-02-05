@@ -28,6 +28,8 @@ import java.util.*
 
 private val LOG = Logger.getInstance(CargoMetadata::class.java)
 
+typealias PathConverter = (String) -> String
+
 /**
  * Classes mirroring JSON output of `cargo metadata`.
  * Attribute names and snake_case are crucial.
@@ -60,8 +62,12 @@ object CargoMetadata {
          * Path to workspace root folder. Can be null for old cargo version
          */
         val workspace_root: String
-    )
-
+    ) {
+        fun convertPaths(converter: PathConverter): Project = copy(
+            packages = packages.map { it.convertPaths(converter) },
+            workspace_root = converter(workspace_root)
+        )
+    }
 
     data class Package(
         val name: String,
@@ -125,7 +131,12 @@ object CargoMetadata {
          * any additional data.
          */
         val dependencies: List<RawDependency>
-    )
+    ) {
+        fun convertPaths(converter: PathConverter): Package = copy(
+            manifest_path = converter(manifest_path),
+            targets = targets.map { it.convertPaths(converter) }
+        )
+    }
 
     data class RawDependency(
         /** A `package` name (non-normalized) of the dependency */
@@ -220,6 +231,10 @@ object CargoMetadata {
                     else -> CrateType.UNKNOWN
                 }
             }
+
+        fun convertPaths(converter: PathConverter): Target = copy(
+            src_path = converter(src_path)
+        )
     }
 
     enum class TargetKind {
