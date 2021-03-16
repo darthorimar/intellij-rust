@@ -30,12 +30,9 @@ import org.rust.lang.core.macros.decl.DeclMacroExpander
 import org.rust.lang.core.macros.proc.ProcMacroExpander
 import org.rust.lang.core.psi.RsFile
 import org.rust.lang.core.psi.RsMacroCall
-import org.rust.lang.core.psi.ext.bodyHash
-import org.rust.lang.core.psi.ext.containingCrate
-import org.rust.lang.core.psi.ext.stubDescendantsOfTypeStrict
+import org.rust.lang.core.psi.ext.*
 import org.rust.lang.core.psi.shouldIndexFile
 import org.rust.lang.core.resolve.DEFAULT_RECURSION_LIMIT
-import org.rust.lang.core.resolve2.resolveToMacroWithoutPsi
 import org.rust.lang.core.stubs.RsFileStub
 import org.rust.openapiext.*
 import org.rust.stdext.*
@@ -90,9 +87,9 @@ class ExpandedMacroStorage(val project: Project) {
         return list
     }
 
-    fun makeExpansionTask(map: Map<VirtualFile, List<RsMacroCall>>): Sequence<List<Extractable>> {
-        val v2 = WriteAction.computeAndWait<MutableMap<SourceFile, List<RsMacroCall>>, Throwable> {
-            map.mapKeysTo(HashMap<SourceFile, List<RsMacroCall>>()) { (file, _) ->
+    fun makeExpansionTask(map: Map<VirtualFile, List<RsPossibleMacroCall>>): Sequence<List<Extractable>> {
+        val v2 = WriteAction.computeAndWait<MutableMap<SourceFile, List<RsPossibleMacroCall>>, Throwable> {
+            map.mapKeysTo(hashMapOf()) { (file, _) ->
                 getOrCreateSourceFile(file) ?: error("Non-root source files are not supported")
             }
         }
@@ -103,7 +100,7 @@ class ExpandedMacroStorage(val project: Project) {
 
     fun makeValidationTask(
         workspaceOnly: Boolean,
-        map: MutableMap<SourceFile, List<RsMacroCall>> = mutableMapOf()
+        map: MutableMap<SourceFile, List<RsPossibleMacroCall>> = mutableMapOf()
     ): Sequence<List<Extractable>> {
         checkReadAccessAllowed()
 
@@ -219,7 +216,7 @@ class ExpandedMacroStorage(val project: Project) {
         return expandedFileToInfo[file.fileId]
     }
 
-    fun getInfoForCall(call: RsMacroCall): ExpandedMacroInfo? {
+    fun getInfoForCall(call: RsPossibleMacroCall): ExpandedMacroInfo? {
         checkReadAccessAllowed()
 
         val file = call.containingFile.virtualFile ?: return null
@@ -440,7 +437,7 @@ class SourceFile(
 
     private fun <T> matchRefs(
         matcher: RefMatcher<T>,
-        prefetchedCalls: List<RsMacroCall>? = null
+        prefetchedCalls: List<RsPossibleMacroCall>? = null
     ): T {
         checkReadAccessAllowed()
         val psi = loadPsi() ?: return matcher.none()
@@ -491,7 +488,7 @@ class SourceFile(
         infos.remove(info) // No synchronization needed in the write action
     }
 
-    fun extract(workspaceOnly: Boolean, calls: List<RsMacroCall>?): List<Pipeline.Stage1ResolveAndExpand>? {
+    fun extract(workspaceOnly: Boolean, calls: List<RsPossibleMacroCall>?): List<Pipeline.Stage1ResolveAndExpand>? {
         if (workspaceOnly && !isBelongToWorkspace) {
             // very hot path; the condition should be as fast as possible
             return emptyList()
@@ -500,7 +497,7 @@ class SourceFile(
         return extract(calls)
     }
 
-    private fun extract(calls: List<RsMacroCall>?): List<Pipeline.Stage1ResolveAndExpand>? {
+    private fun extract(calls: List<RsPossibleMacroCall>?): List<Pipeline.Stage1ResolveAndExpand>? {
         checkReadAccessAllowed() // Needed to access PSI
         checkIsSmartMode(project)
 
@@ -555,9 +552,9 @@ class SourceFile(
         }
     }
 
-    private fun freshExtractMacros(prefetchedCalls: List<RsMacroCall>?) {
+    private fun freshExtractMacros(prefetchedCalls: List<RsPossibleMacroCall>?) {
         val psi = loadPsi() ?: return
-        val calls = prefetchedCalls ?: psi.stubDescendantsOfTypeStrict<RsMacroCall>().filter { it.isTopLevelExpansion }
+        val calls = prefetchedCalls ?: psi.stubDescendantsOfTypeStrict<RsPossibleMacroCall>().filter { it.isTopLevelExpansion }
         val newInfos = calls.map { call ->
             ExpandedMacroInfoImpl.newStubLinked(this, call)
         }
@@ -572,14 +569,15 @@ class SourceFile(
      * We don't want to execute the entire method in synchronized section because it performs macro name
      * resolution (heavy stuff). All changes are published in the last [switchToStubRefsInReadAction] call
      */
-    private fun recoverRefs(prefetchedCalls: List<RsMacroCall>?) {
+    private fun recoverRefs(prefetchedCalls: List<RsPossibleMacroCall>?) {
         checkReadAccessAllowed()
         Testmarks.refsRecover.hit()
 
         val psi = loadPsi() ?: return
-        val calls = prefetchedCalls ?: psi.stubDescendantsOfTypeStrict<RsMacroCall>().filter { it.isTopLevelExpansion }
+        val calls = prefetchedCalls ?: psi.stubDescendantsOfTypeStrict<RsPossibleMacroCall>()
+            .filter { it.isTopLevelExpansion }
         val unboundInfos = sync { infos.toMutableList() }
-        val orphans = mutableListOf<RsMacroCall>()
+        val orphans = mutableListOf<RsPossibleMacroCall>()
         val bindList = mutableListOf<Pair<ExpandedMacroInfoImpl, Int>>()
         for (call in calls) {
             val info = unboundInfos.find { it.isUpToDate(call, call.resolveToMacroWithoutPsi()) }
@@ -629,7 +627,7 @@ class SourceFile(
     private fun loadPsi(): RsFile? =
         file.takeIf { it.isValid }?.toPsiFile(project) as? RsFile
 
-    fun getInfoForCall(seekingCall: RsMacroCall): ExpandedMacroInfo? {
+    fun getInfoForCall(seekingCall: RsPossibleMacroCall): ExpandedMacroInfo? {
         testAssert { seekingCall.containingFile.virtualFile == file }
 
         return matchRefs(object : RefMatcher<ExpandedMacroInfoImpl?> {
@@ -646,16 +644,16 @@ class SourceFile(
         })
     }
 
-    fun getCallForInfo(info: ExpandedMacroInfoImpl): RsMacroCall? {
+    fun getCallForInfo(info: ExpandedMacroInfoImpl): RsPossibleMacroCall? {
         check(info.sourceFile == this)
 
-        return matchRefs(object : RefMatcher<RsMacroCall?> {
-            override fun none(): RsMacroCall? = null
+        return matchRefs(object : RefMatcher<RsPossibleMacroCall?> {
+            override fun none(): RsPossibleMacroCall? = null
 
-            override fun strong(infos: List<ExpandedMacroInfoImpl>): RsMacroCall? =
+            override fun strong(infos: List<ExpandedMacroInfoImpl>): RsPossibleMacroCall? =
                 info.derefMacroCall()
 
-            override fun stub(psi: RsFile, infos: List<ExpandedMacroInfoImpl>): RsMacroCall? {
+            override fun stub(psi: RsFile, infos: List<ExpandedMacroInfoImpl>): RsPossibleMacroCall? {
                 val stubIndex = info.macroCallStubIndex
                 if (stubIndex == -1) return null
                 return psi.stubbedSpine.getMacroCall(stubIndex)
@@ -663,7 +661,7 @@ class SourceFile(
         })
     }
 
-    fun newMacroCallsAdded(newMacroCalls: Collection<RsMacroCall>) {
+    fun newMacroCallsAdded(newMacroCalls: Collection<RsPossibleMacroCall>) {
         checkWriteAccessAllowed()
         val refKind = getRefKind()
         if (refKind == RefKind.STRONG) {
@@ -723,9 +721,9 @@ class SourceFile(
         }
     }
 
-    private fun StubbedSpine.getMacroCall(stubIndex: Int): RsMacroCall? {
+    private fun StubbedSpine.getMacroCall(stubIndex: Int): RsPossibleMacroCall? {
         val element = getStubPsi(stubIndex)
-        return if (element is RsMacroCall) {
+        return if (element is RsPossibleMacroCall) {
             element
         } else {
             val document = FileDocumentManager.getInstance().getCachedDocument(file)
@@ -754,7 +752,7 @@ class SourceFile(
         if (modificationStamp != FRESH_FLAG) modificationStamp = FORCE_RELINK_FLAG
     }
 
-    private fun ExpandedMacroInfoImpl.derefMacroCall(): RsMacroCall? {
+    private fun ExpandedMacroInfoImpl.derefMacroCall(): RsPossibleMacroCall? {
         assertSync()
         return macroCallStrongRef?.takeIf { it.isValid }
     }
@@ -834,8 +832,8 @@ interface ExpandedMacroInfo {
     val sourceFile: SourceFile
     val expansionFile: VirtualFile?
     val expansionFileHash: Long
-    fun getMacroCall(): RsMacroCall?
-    fun isUpToDate(call: RsMacroCall, def: RsMacroDataWithHash<*>?): Boolean
+    fun getMacroCall(): RsPossibleMacroCall?
+    fun isUpToDate(call: RsPossibleMacroCall, def: RsMacroDataWithHash<*>?): Boolean
     fun getExpansion(): MacroExpansion?
 }
 
@@ -846,15 +844,15 @@ class ExpandedMacroInfoImpl(
     val callHash: HashCode?,
     override val expansionFileHash: Long = 0,
     var macroCallStubIndex: Int = -1,
-    var macroCallStrongRef: RsMacroCall? = null
+    var macroCallStrongRef: RsPossibleMacroCall? = null
 ) : ExpandedMacroInfo {
     private val expansionFileUrl: String? get() = expansionFile?.url
     val fileId: Int get() = expansionFile?.fileId ?: -1
 
-    override fun getMacroCall(): RsMacroCall? =
+    override fun getMacroCall(): RsPossibleMacroCall? =
         sourceFile.getCallForInfo(this)
 
-    override fun isUpToDate(call: RsMacroCall, def: RsMacroDataWithHash<*>?): Boolean =
+    override fun isUpToDate(call: RsPossibleMacroCall, def: RsMacroDataWithHash<*>?): Boolean =
         callHash == call.bodyHash && def?.bodyHash == defHash
 
     override fun getExpansion(): MacroExpansion? {
@@ -869,7 +867,7 @@ class ExpandedMacroInfoImpl(
         return expansionFile.toPsiFile(sourceFile.project) as? RsFile
     }
 
-    fun makePipeline(call: RsMacroCall?): Pipeline.Stage1ResolveAndExpand {
+    fun makePipeline(call: RsPossibleMacroCall?): Pipeline.Stage1ResolveAndExpand {
         return if (call != null) {
             ExpansionPipeline.Stage1(call, this)
         } else {
@@ -891,7 +889,7 @@ class ExpandedMacroInfoImpl(
     }
 
     companion object {
-        fun newStubLinked(sf: SourceFile, call: RsMacroCall): ExpandedMacroInfoImpl =
+        fun newStubLinked(sf: SourceFile, call: RsPossibleMacroCall): ExpandedMacroInfoImpl =
             ExpandedMacroInfoImpl(sf, null, null, call.bodyHash, macroCallStubIndex = call.calcStubIndex())
     }
 }
@@ -948,6 +946,9 @@ private fun DataInputStream.readUTFNullable(): String? {
         null
     }
 }
+
+private fun RsPossibleMacroCall.calcStubIndex(): Int =
+    (this as StubBasedPsiElement<*>).calcStubIndex()
 
 private fun StubBasedPsiElement<*>.calcStubIndex(): Int {
     ProgressManager.checkCanceled()

@@ -14,7 +14,6 @@ import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.stubs.IStubElementType
 import com.intellij.util.Query
 import org.rust.ide.icons.RsIcons
-import org.rust.ide.utils.isEnabledByCfg
 import org.rust.lang.core.macros.RsExpandedElement
 import org.rust.lang.core.psi.*
 import org.rust.lang.core.resolve.KNOWN_DERIVABLE_TRAITS
@@ -42,6 +41,7 @@ val RsTraitItem.isAuto: Boolean
 
 val RsTraitItem.isKnownDerivable: Boolean get() {
     val derivableTrait = KNOWN_DERIVABLE_TRAITS[name] ?: return false
+    if (!derivableTrait.shouldUseHardcodedTraitDerive()) return false
     return derivableTrait.findTrait(knownItems) == this
 }
 
