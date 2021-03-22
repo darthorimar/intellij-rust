@@ -55,7 +55,10 @@ class CrateNotFoundInspection : TomlLocalInspectionToolBase() {
             if (property in dependency.properties) return
         }
 
-        if (CratesLocalIndexService.getInstance().getCrate(dependency.crateName) == null) {
+        val cratesService = CratesLocalIndexService.getInstance()
+        if (cratesService.isUpdating) return
+
+        if (cratesService.getCrate(dependency.crateName) == null) {
             holder.registerProblem(dependency.crateNameElement, "Crate ${dependency.crateName} not found")
         }
     }

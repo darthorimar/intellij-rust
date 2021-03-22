@@ -9,6 +9,8 @@ import com.intellij.openapi.components.service
 import org.jetbrains.annotations.TestOnly
 
 interface CratesLocalIndexService {
+    val isUpdating: Boolean
+    
     fun getCrate(crateName: String): CargoRegistryCrate?
     fun getAllCrateNames(): List<String>
 

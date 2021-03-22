@@ -93,9 +93,11 @@ class CratesLocalIndexServiceImpl
     private var state: CratesLocalIndexState = CratesLocalIndexState()
 
     /**
-     * [isUpdating] will be true when index is performing [CratesLocalIndexUpdateTask]
+     * [isUpdating_] will be true when index is performing [CratesLocalIndexUpdateTask]
      */
-    private val isUpdating: AtomicBoolean = AtomicBoolean(false)
+    private val isUpdating_: AtomicBoolean = AtomicBoolean(false)
+
+    override val isUpdating get() = isUpdating_.get()
 
     init {
         if (!isUnitTestMode) {
@@ -103,7 +105,7 @@ class CratesLocalIndexServiceImpl
             ApplicationManager.getApplication().messageBus.connect().subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
                 override fun after(events: MutableList<out VFileEvent>) {
                     if (events.any { it.pathEndsWith(CargoConstants.MANIFEST_FILE) }) {
-                        if (!isUpdating.get()) {
+                        if (!isUpdating_.get()) {
                             updateIfNeeded()
                         }
                     }
@@ -118,7 +120,7 @@ class CratesLocalIndexServiceImpl
     }
 
     override fun getCrate(crateName: String): CargoRegistryCrate? {
-        if (isUpdating.get() || crates == null) return null
+        if (isUpdating_.get() || crates == null) return null
 
         return try {
             crates.get(crateName)
@@ -129,7 +131,7 @@ class CratesLocalIndexServiceImpl
     }
 
     override fun getAllCrateNames(): List<String> {
-        if (isUpdating.get() || crates == null) return emptyList()
+        if (isUpdating_.get() || crates == null) return emptyList()
 
         val crateNames = mutableListOf<String>()
 
@@ -146,7 +148,7 @@ class CratesLocalIndexServiceImpl
 
     @VisibleForTesting
     fun updateIfNeeded() {
-        if (state.indexedCommitHash != registryHeadCommitHash && isUpdating.compareAndSet(false, true)) {
+        if (state.indexedCommitHash != registryHeadCommitHash && isUpdating_.compareAndSet(false, true)) {
             CratesLocalIndexUpdateTask(registryHeadCommitHash).queue()
         }
     }
@@ -262,7 +264,7 @@ class CratesLocalIndexServiceImpl
         }
 
         override fun onFinished() {
-            isUpdating.set(false)
+            isUpdating_.set(false)
         }
     }
 
