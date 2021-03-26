@@ -12,6 +12,8 @@ import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.ProjectViewTestUtil
 import org.rust.cargo.RsWithToolchainTestBase
 import org.rust.cargo.project.model.cargoProjects
+import org.rust.ide.experiments.RsExperiments
+import org.rust.openapiext.runWithEnabledFeatures
 import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.TreePath
@@ -24,15 +26,17 @@ abstract class RsProjectViewTestBase : RsWithToolchainTestBase() {
     }
 
     fun `test external library node`() {
-        buildProject {
-            toml("Cargo.toml", """
-                [package]
-                name = "intellij-rust-test"
-                version = "0.1.0"
-                authors = []
-            """)
-            dir("src") {
-                rust("main.rs", "")
+        runWithEnabledFeatures(RsExperiments.FETCH_ACTUAL_STDLIB_METADATA) {
+            buildProject {
+                toml("Cargo.toml", """
+                    [package]
+                    name = "intellij-rust-test"
+                    version = "0.1.0"
+                    authors = []
+                """)
+                dir("src") {
+                    rust("main.rs", "")
+                }
             }
         }
 
@@ -43,18 +47,20 @@ abstract class RsProjectViewTestBase : RsWithToolchainTestBase() {
     }
 
     fun `test external library node with external dependencies`() {
-        buildProject {
-            toml("Cargo.toml", """
-                [package]
-                name = "intellij-rust-test"
-                version = "0.1.0"
-                authors = []
+        runWithEnabledFeatures(RsExperiments.FETCH_ACTUAL_STDLIB_METADATA) {
+            buildProject {
+                toml("Cargo.toml", """
+                    [package]
+                    name = "intellij-rust-test"
+                    version = "0.1.0"
+                    authors = []
 
-                [dependencies]
-                code-generation-example = "^0.1.0"
-            """)
-            dir("src") {
-                rust("main.rs", "")
+                    [dependencies]
+                    code-generation-example = "^0.1.0"
+                """)
+                dir("src") {
+                    rust("main.rs", "")
+                }
             }
         }
 

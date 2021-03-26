@@ -5,6 +5,7 @@
 
 package org.rust.cargo
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.RecursionManager
 import com.intellij.openapi.vfs.VirtualFile
@@ -16,6 +17,7 @@ import com.intellij.util.ui.UIUtil
 import org.rust.*
 import org.rust.cargo.project.model.impl.testCargoProjects
 import org.rust.cargo.toolchain.tools.rustc
+import org.rust.ide.experiments.RsExperiments
 import org.rust.lang.core.macros.macroExpansionManager
 import org.rust.openapiext.pathAsPath
 
@@ -91,6 +93,8 @@ abstract class RsWithToolchainTestBase : CodeInsightFixtureTestCase<ModuleFixtur
                 )
             )
         }
+        // RsExperiments.FETCH_ACTUAL_STDLIB_METADATA significantly slows down tests
+        setExperimentalFeatureEnabled(RsExperiments.FETCH_ACTUAL_STDLIB_METADATA, false, testRootDisposable)
     }
 
     override fun tearDown() {
@@ -101,6 +105,10 @@ abstract class RsWithToolchainTestBase : CodeInsightFixtureTestCase<ModuleFixtur
     }
 
     protected open fun createRustupFixture(): RustupTestFixture = RustupTestFixture(project)
+
+    override fun getTestRootDisposable(): Disposable {
+        return if (myFixture != null) myFixture.testRootDisposable else super.getTestRootDisposable()
+    }
 
     protected fun buildProject(builder: FileTreeBuilder.() -> Unit): TestProject =
         fileTree { builder() }.create()

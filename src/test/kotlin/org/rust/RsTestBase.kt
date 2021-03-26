@@ -41,6 +41,7 @@ import org.rust.cargo.project.workspace.FeatureDep
 import org.rust.cargo.project.workspace.PackageFeature
 import org.rust.cargo.toolchain.RustChannel
 import org.rust.cargo.toolchain.impl.RustcVersion
+import org.rust.ide.experiments.RsExperiments
 import org.rust.lang.core.macros.findExpansionElements
 import org.rust.lang.core.macros.macroExpansionManager
 import org.rust.lang.core.psi.ext.startOffset
@@ -81,6 +82,8 @@ abstract class RsTestBase : BasePlatformTestCase(), RsTestCase {
             Disposer.register(testRootDisposable, disposable)
         }
         RecursionManager.disableMissedCacheAssertions(testRootDisposable)
+        // RsExperiments.FETCH_ACTUAL_STDLIB_METADATA significantly slows down tests
+        setExperimentalFeatureEnabled(RsExperiments.FETCH_ACTUAL_STDLIB_METADATA, false, testRootDisposable)
         tempDirRoot = myFixture.findFileInTempDir(".")
         tempDirRootUrl = tempDirRoot?.url
     }
