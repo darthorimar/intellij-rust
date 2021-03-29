@@ -33,7 +33,7 @@ class WasmPack(toolchain: RsToolchain) : CargoBinary(NAME, toolchain) {
         var commandLine = createBaseCommandLine(allArgs, workingDirectory.toPath())
             .withRedirectErrorStream(true)
 
-        if (!SystemInfo.isWindows) {
+        if (!SystemInfo.isWindows) { // TODO
             commandLine = PtyCommandLine(commandLine)
                 .withInitialColumns(PtyCommandLine.MAX_COLUMNS)
                 .withConsoleMode(false)

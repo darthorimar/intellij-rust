@@ -19,8 +19,10 @@ import java.nio.file.Path
 
 class RsLocalToolchainProvider : RsToolchainProvider {
 
+    // BACKCOMPAT: 2020.3
+    // Use [WslDistributionManager.isWslPath]
     override fun isApplicable(homePath: Path): Boolean =
-        !homePath.toString().startsWith(WSLDistribution.UNC_PREFIX)
+        !SystemInfo.isWindows || !homePath.toString().startsWith(WSLDistribution.UNC_PREFIX)
 
     override fun getToolchain(homePath: Path): RsToolchain = RsLocalToolchain(homePath)
 }
@@ -28,13 +30,13 @@ class RsLocalToolchainProvider : RsToolchainProvider {
 open class RsLocalToolchain(location: Path) : RsToolchain(location) {
     override val fileSeparator: String get() = File.separator
 
+    override val executionTimeoutInMilliseconds: Int = 1000
+
     override fun <T : GeneralCommandLine> patchCommandLine(commandLine: T): T = commandLine
 
     override fun startProcess(commandLine: GeneralCommandLine): ProcessHandler = RsProcessHandler(commandLine)
 
     override fun toLocalPath(remotePath: String): String = remotePath
-
-    override fun toRemotePath(localPath: String): String = localPath
 
     override fun expandUserHome(remotePath: String): String = FileUtil.expandUserHome(remotePath)
 

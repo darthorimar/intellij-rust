@@ -17,12 +17,14 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.Key
 import org.rust.cargo.project.model.cargoProjects
+import org.rust.cargo.project.settings.toolchain
 import org.rust.cargo.runconfig.buildtool.CargoBuildManager.getBuildConfiguration
 import org.rust.cargo.runconfig.buildtool.CargoBuildManager.isBuildConfiguration
 import org.rust.cargo.runconfig.buildtool.CargoBuildManager.isBuildToolWindowEnabled
 import org.rust.cargo.runconfig.buildtool.cargoPatches
 import org.rust.cargo.runconfig.command.CargoCommandConfiguration
 import org.rust.cargo.toolchain.CargoCommandLine
+import org.rust.cargo.toolchain.RsToolchain
 import org.rust.cargo.toolchain.impl.CompilerArtifactMessage
 import org.rust.cargo.toolchain.tools.Cargo.Companion.getCargoCommonPatch
 import org.rust.cargo.util.CargoArgsParser.Companion.parseArgs
@@ -50,7 +52,7 @@ abstract class RsExecutableRunner(
             state.rustVersion()?.host.orEmpty()
         }
         if (!checkToolchainConfigured(project)) return
-        val toolchainError = checkToolchainSupported(host)
+        val toolchainError = checkToolchainSupported(project.toolchain, host)
         if (toolchainError != null) {
             processInvalidToolchain(project, toolchainError)
             return
@@ -133,7 +135,7 @@ abstract class RsExecutableRunner(
         return DefaultExecutionResult(console, handler)
     }
 
-    open fun checkToolchainSupported(host: String): BuildResult.ToolchainError? = null
+    open fun checkToolchainSupported(toolchain: RsToolchain?, host: String): BuildResult.ToolchainError? = null
 
     open fun checkToolchainConfigured(project: Project): Boolean = true
 

@@ -7,22 +7,42 @@ package org.rust.cargo.toolchain.wsl
 
 import com.intellij.execution.wsl.WSLDistribution
 import com.intellij.execution.wsl.WSLUtil
+import com.intellij.execution.wsl.WslDistributionManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapiext.isDispatchThread
 import com.intellij.util.io.isFile
 import org.rust.openapiext.computeWithCancelableProgress
 import org.rust.stdext.toPath
 import java.nio.file.Path
 import java.nio.file.Paths
 
-fun WSLDistribution.fetchEnvironmentVariable(project: Project, varName: String): String? =
-    project.computeWithCancelableProgress("Fetching $varName value...") { environment[varName] }
+
+fun fetchInstalledWslDistributions(
+    project: Project = ProjectManager.getInstance().defaultProject
+): List<WSLDistribution> = if (isDispatchThread) {
+    project.computeWithCancelableProgress("Getting installed distributions...") {
+        WslDistributionManager.getInstance().installedDistributions
+    }
+} else {
+    WslDistributionManager.getInstance().installedDistributions
+}
+
+fun WSLDistribution.fetchEnvironmentVariable(
+    varName: String,
+    project: Project = ProjectManager.getInstance().defaultProject
+): String? = if (isDispatchThread) {
+    project.computeWithCancelableProgress("Fetching $varName value...") {
+        environment[varName]
+    }
+} else {
+    environment[varName]
+}
 
 fun WSLDistribution.expandUserHome(path: String): String {
     if (!path.startsWith("~/")) return path
-    val project = ProjectManager.getInstance().defaultProject
-    val userHome = fetchEnvironmentVariable(project, "HOME") ?: return path
+    val userHome = fetchEnvironmentVariable("HOME") ?: return path
     return "$userHome${path.substring(1)}"
 }
 

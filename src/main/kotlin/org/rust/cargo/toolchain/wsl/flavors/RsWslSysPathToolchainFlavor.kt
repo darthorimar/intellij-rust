@@ -5,26 +5,26 @@
 
 package org.rust.cargo.toolchain.wsl.flavors
 
-import com.intellij.execution.wsl.WSLUtil
-import com.intellij.openapi.project.ProjectManager
+import com.intellij.util.io.isDirectory
 import org.rust.cargo.toolchain.wsl.fetchEnvironmentVariable
+import org.rust.cargo.toolchain.wsl.fetchInstalledWslDistributions
 import org.rust.stdext.toPath
-import java.io.File
 import java.nio.file.Path
 
 class RsWslSysPathToolchainFlavor : RsWslToolchainFlavor() {
     @Suppress("UnstableApiUsage")
     override fun getHomePathCandidates(): List<Path> {
         val paths = mutableListOf<Path>()
-        val project = ProjectManager.getInstance().defaultProject
-        for (distro in WSLUtil.getAvailableDistributions()) {
-            val sysPath = distro.fetchEnvironmentVariable(project, "PATH") ?: continue
-            val uncRoot = distro.uncRoot
-            for (root in sysPath.split(":")) {
-                if (root.isEmpty()) continue
-                val file = File(uncRoot, root)
-                if (!file.isDirectory) continue
-                paths.add(file.absolutePath.toPath())
+        for (distro in fetchInstalledWslDistributions()) {
+            val sysPath = distro.fetchEnvironmentVariable("PATH") ?: continue
+            // BACKCOMPAT: 2020.3
+            // Replace with `distro.uncRootPath`
+            val root = distro.uncRoot.path.toPath()
+            for (remotePath in sysPath.split(":")) {
+                if (remotePath.isEmpty()) continue
+                val localPath = root.resolve(remotePath)
+                if (!localPath.isDirectory()) continue
+                paths.add(localPath)
             }
         }
         return paths

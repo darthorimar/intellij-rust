@@ -26,14 +26,16 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import org.jetbrains.concurrency.AsyncPromise
 import org.jetbrains.concurrency.Promise
+import org.rust.cargo.project.settings.toolchain
 import org.rust.cargo.runconfig.*
 import org.rust.cargo.runconfig.buildtool.CargoBuildManager.getBuildConfiguration
 import org.rust.cargo.runconfig.buildtool.CargoBuildManager.isBuildConfiguration
 import org.rust.cargo.runconfig.buildtool.CargoBuildManager.isBuildToolWindowEnabled
 import org.rust.cargo.runconfig.command.CargoCommandConfiguration
 import org.rust.cargo.toolchain.CargoCommandLine
-import org.rust.cargo.toolchain.impl.CompilerArtifactMessage
+import org.rust.cargo.toolchain.RsToolchain
 import org.rust.cargo.toolchain.impl.CargoMetadata
+import org.rust.cargo.toolchain.impl.CompilerArtifactMessage
 import org.rust.cargo.toolchain.tools.Cargo.Companion.getCargoCommonPatch
 import org.rust.cargo.toolchain.tools.cargo
 import org.rust.cargo.util.CargoArgsParser.Companion.parseArgs
@@ -127,7 +129,7 @@ abstract class RsAsyncRunner(
 
     open fun checkToolchainConfigured(project: Project): Boolean = true
 
-    open fun checkToolchainSupported(host: String): BuildResult.ToolchainError? = null
+    open fun checkToolchainSupported(toolchain: RsToolchain?, host: String): BuildResult.ToolchainError? = null
 
     open fun processUnsupportedToolchain(
         project: Project,
@@ -173,7 +175,7 @@ abstract class RsAsyncRunner(
                         override fun run(indicator: ProgressIndicator) {
                             indicator.isIndeterminate = true
                             val host = state.rustVersion()?.host.orEmpty()
-                            result = checkToolchainSupported(host)
+                            result = checkToolchainSupported(project.toolchain, host)
                             if (result != null) return
 
                             val processForJson = CapturingProcessHandler(

@@ -9,13 +9,14 @@ import com.intellij.openapi.project.Project
 import org.jetbrains.concurrency.AsyncPromise
 import org.rust.cargo.runconfig.BuildResult.ToolchainError
 import org.rust.cargo.runconfig.legacy.RsAsyncRunner.Companion.Binary
+import org.rust.cargo.toolchain.RsToolchain
 import org.rust.clion.debugger.runconfig.RsCLionDebugRunnerUtils
 import org.rust.debugger.runconfig.legacy.RsDebugRunnerLegacyBase
 
 class RsCLionDebugRunnerLegacy : RsDebugRunnerLegacyBase() {
 
-    override fun checkToolchainSupported(host: String): ToolchainError? =
-        RsCLionDebugRunnerUtils.checkToolchainSupported(host)
+    override fun checkToolchainSupported(toolchain: RsToolchain?, host: String): ToolchainError? =
+        RsCLionDebugRunnerUtils.checkToolchainSupported(toolchain, host)
 
     override fun checkToolchainConfigured(project: Project): Boolean =
         RsCLionDebugRunnerUtils.checkToolchainConfigured(project)

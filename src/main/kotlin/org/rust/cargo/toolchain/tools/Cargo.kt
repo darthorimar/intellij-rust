@@ -93,7 +93,7 @@ open class Cargo(toolchain: RsToolchain, useWrapper: Boolean = false)
 
     fun listInstalledBinaryCrates(): List<BinaryCrate> =
         createBaseCommandLine("install", "--list")
-            .execute()
+            .execute(toolchain.executionTimeoutInMilliseconds)
             ?.stdoutLines
             ?.filterNot { it.startsWith(" ") }
             ?.map { BinaryCrate.from(it) }
@@ -106,7 +106,10 @@ open class Cargo(toolchain: RsToolchain, useWrapper: Boolean = false)
     }
 
     fun checkSupportForBuildCheckAllTargets(): Boolean {
-        val lines = createBaseCommandLine("help", "check").execute()?.stdoutLines ?: return false
+        val lines = createBaseCommandLine("help", "check")
+            .execute(toolchain.executionTimeoutInMilliseconds)
+            ?.stdoutLines
+            ?: return false
         return lines.any { it.contains(" --all-targets ") }
     }
 
@@ -145,7 +148,8 @@ open class Cargo(toolchain: RsToolchain, useWrapper: Boolean = false)
         listener: ProcessListener? = null
     ): CargoMetadata.Project {
         val additionalArgs = mutableListOf("--verbose", "--format-version", "1", "--all-features")
-        val json = CargoCommandLine("metadata", projectDirectory, additionalArgs)
+        val qwe = CargoCommandLine("metadata", projectDirectory, additionalArgs)
+        val json = qwe
             .execute(owner, listener = listener)
             .stdout
             .dropWhile { it != '{' }

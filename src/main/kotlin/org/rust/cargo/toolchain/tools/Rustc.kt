@@ -14,6 +14,7 @@ import org.rust.cargo.toolchain.RsToolchain
 import org.rust.cargo.toolchain.RsToolchain.Companion.RUSTC_BOOTSTRAP
 import org.rust.cargo.toolchain.impl.RustcVersion
 import org.rust.cargo.toolchain.impl.parseRustcVersion
+import org.rust.cargo.toolchain.wsl.RsWslToolchain
 import org.rust.openapiext.checkIsBackgroundThread
 import org.rust.openapiext.execute
 import org.rust.openapiext.isSuccess
@@ -28,7 +29,7 @@ class Rustc(toolchain: RsToolchain) : RustupComponent(NAME, toolchain) {
             checkIsBackgroundThread()
         }
         val lines = createBaseCommandLine("--version", "--verbose", workingDirectory = workingDirectory)
-            .execute()
+            .execute(toolchain.executionTimeoutInMilliseconds)
             ?.stdoutLines
         return lines?.let { parseRustcVersion(it) }
     }
@@ -42,7 +43,11 @@ class Rustc(toolchain: RsToolchain) : RustupComponent(NAME, toolchain) {
             "--print", "sysroot",
             workingDirectory = projectDirectory
         ).execute(timeoutMs)
-        return if (output?.isSuccess == true) output.stdout.trim() else null
+        var sysroot = if (output?.isSuccess == true) output.stdout.trim() else null
+        if (toolchain is RsWslToolchain) {
+            sysroot = sysroot?.let { toolchain.toUncPath(it) }
+        }
+        return sysroot
     }
 
     fun getStdlibPathFromSysroot(projectDirectory: Path): String? {
@@ -51,9 +56,7 @@ class Rustc(toolchain: RsToolchain) : RustupComponent(NAME, toolchain) {
     }
 
     fun getStdlibFromSysroot(projectDirectory: Path): VirtualFile? {
-        val stdlibPath = getStdlibPathFromSysroot(projectDirectory)
-            ?.let { toolchain.toLocalPath(it) }
-            ?: return null
+        val stdlibPath = getStdlibPathFromSysroot(projectDirectory) ?: return null
         val fs = LocalFileSystem.getInstance()
         return fs.refreshAndFindFileByPath(stdlibPath)
     }

@@ -41,6 +41,8 @@ abstract class RsToolchain(val location: Path) {
 
     abstract val fileSeparator: String
 
+    abstract val executionTimeoutInMilliseconds: Int
+
     fun looksLikeValidToolchain(): Boolean = RsToolchainFlavor.getFlavor(location) != null
 
     /**
@@ -51,8 +53,6 @@ abstract class RsToolchain(val location: Path) {
     abstract fun startProcess(commandLine: GeneralCommandLine): ProcessHandler
 
     abstract fun toLocalPath(remotePath: String): String
-
-    abstract fun toRemotePath(localPath: String): String
 
     abstract fun expandUserHome(remotePath: String): String
 
@@ -117,7 +117,7 @@ abstract class RsToolchain(val location: Path) {
         environmentVariables.configureCommandLine(commandLine, true)
 
         if (emulateTerminal) {
-            if (!SystemInfo.isWindows) {
+            if (!SystemInfo.isWindows) { // TODO
                 commandLine.environment["TERM"] = "xterm-256color"
             }
             commandLine = PtyCommandLine(commandLine).withInitialColumns(PtyCommandLine.MAX_COLUMNS)

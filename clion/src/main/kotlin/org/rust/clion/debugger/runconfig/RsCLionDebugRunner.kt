@@ -7,12 +7,13 @@ package org.rust.clion.debugger.runconfig
 
 import com.intellij.openapi.project.Project
 import org.rust.cargo.runconfig.BuildResult.ToolchainError
+import org.rust.cargo.toolchain.RsToolchain
 import org.rust.debugger.runconfig.RsDebugRunnerBase
 
 class RsCLionDebugRunner : RsDebugRunnerBase() {
 
-    override fun checkToolchainSupported(host: String): ToolchainError? =
-        RsCLionDebugRunnerUtils.checkToolchainSupported(host)
+    override fun checkToolchainSupported(toolchain: RsToolchain?, host: String): ToolchainError? =
+        RsCLionDebugRunnerUtils.checkToolchainSupported(toolchain, host)
 
     override fun checkToolchainConfigured(project: Project): Boolean =
         RsCLionDebugRunnerUtils.checkToolchainConfigured(project)

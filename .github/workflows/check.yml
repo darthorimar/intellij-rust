@@ -145,12 +145,20 @@ jobs:
                   components: rust-src
                   default: false
 
-            - name: Set up WSL Rust
+            - name: Set up WSL
               if: matrix.uses-wsl
               uses: Vampire/setup-wsl@v1
               with:
-                  additional-packages:
-                      cargo
+                distribution: Ubuntu-20.04
+
+            - name: Set up Rust (WSL)
+              if: matrix.uses-wsl
+              shell: wsl-bash {0}
+              run: |
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
+                source $HOME/.cargo/env
+                rustup toolchain install ${{ matrix.rust-version }} --profile minimal --component rust-src rustfmt clippy
+                rustup toolchain install nightly                    --profile minimal --component rust-src
 
             - name: Cache evcxr
               uses: actions/cache@v2
